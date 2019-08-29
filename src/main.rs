@@ -1,6 +1,11 @@
-use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    web, 
+    App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
+    error, Result};
+use failure::Fail;
 use listenfd::ListenFd;
 use serde::{ Serialize, Deserialize };
+mod graph_functions;
 
 struct AppState {
     app_name: String,
@@ -13,17 +18,26 @@ struct MyObj {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Info {
     user_id: u32,
     friend: String,
 }
+
+#[derive(Fail, Debug)]
+#[fail(display = "my error")]
+pub struct MyError {
+    name: &'static str,
+}
+
+impl error::ResponseError for MyError {}
 
 // Responder
 impl Responder for MyObj {
     type Error = Error;
     type Future = Result<HttpResponse, Error>;
 
-    fn respond_to(self, _req: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _req: &HttpRequest) -> Result<HttpResponse, Error> {
         let body = serde_json::to_string(&self)?;
 
         // Create response and set content type
@@ -34,7 +48,9 @@ impl Responder for MyObj {
 }
 
 fn return_json(info: web::Path<Info>) -> impl Responder {
-    MyObj { id: info.user_id, name: info.friend.clone() } // TODO: avoid .clone() somehow?
+    let result: isize = graph_functions::fetch_an_integer().unwrap();
+    // TODO: error handling
+    MyObj { id: result as u32, name: info.friend.clone() } // TODO: avoid .clone() somehow?
 }
 
 fn index(data: web::Data<AppState>) -> impl Responder {
