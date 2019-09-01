@@ -1,10 +1,15 @@
-use futures::future::Future;
+use futures::future::{err, Future};
 use redis::RedisFuture;
 
 pub fn fetch_an_integer_async() -> RedisFuture<isize> {
     // connect to redis
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap(); // TODO: error handling!
-    let connect = client.get_async_connection();
+    let client = redis::Client::open("redis://127.0.0.1/");
+    match client {
+        Err(error) => return Box::new(err(error)),
+        Ok(_) => (),
+    };
+
+    let connect = client.unwrap().get_async_connection();
     let result = connect
         .and_then(|con| redis::cmd("SET").arg("my_key").arg(42).query_async(con))
         .and_then(|(con, ())| {
