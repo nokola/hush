@@ -1,19 +1,25 @@
 use actix_web::{
+    error,
     web,
     // Either,
-    App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
-    error, Result
-    };
+    App,
+    Error,
+    HttpRequest,
+    HttpResponse,
+    HttpServer,
+    Responder,
+    Result,
+};
 use failure::Fail;
-use listenfd::ListenFd;
-use serde::{ Serialize, Deserialize };
-use futures::future::{ 
-    ok, 
-    err, 
+use futures::future::{
+    err,
+    ok,
     // result,
     Future,
-    IntoFuture,
+    // IntoFuture,
 };
+use listenfd::ListenFd;
+use serde::{Deserialize, Serialize};
 
 mod graph_functions;
 
@@ -62,11 +68,12 @@ impl Responder for MyObj {
 
 fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = HttpResponse>> {
     if info.friend != "hoho5" {
-        return Box::new(err(HttpResponse::Unauthorized()
-            .body(format!("Unauthorized: {}. Only hoho5 is authorized", info.friend)))); // WORKING with HttpRespose
+        return Box::new(err(HttpResponse::Unauthorized().body(format!(
+            "Unauthorized: {}. Only hoho5 is authorized",
+            info.friend
+        )))); // WORKING with HttpRespose
     }
 
-    
     // WORKING for impl Responder:
     // HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend))
     // "all good"
@@ -74,16 +81,20 @@ fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = Ht
     // ...do not return anything will return "200 OK"...
 
     let result2: redis::RedisFuture<isize> = graph_functions::fetch_an_integer_async();
-    let result_final = result2.and_then(move |data| {
-        ok(MyObj { id: data as u32, name: info.friend.clone() }) // TODO: avoid .clone() somehow?
-    }).or_else(|redis_error| {
-        err(HttpResponse::InternalServerError().body(redis_error.to_string()))
-    });
+    let result_final = result2
+        .and_then(move |data| {
+            ok(MyObj {
+                id: data as u32,
+                name: info.friend.clone(),
+            }) // TODO: avoid .clone() somehow?
+        })
+        .or_else(|redis_error| {
+            err(HttpResponse::InternalServerError().body(redis_error.to_string()))
+        });
 
     Box::new(result_final) // WORKING
 
     // Box::new(err(error::ErrorInternalServerError("test"))) // WORKING with actix_web::Error
-
 }
 
 fn index(data: web::Data<AppState>) -> impl Responder {
@@ -102,16 +113,13 @@ fn main() {
     let mut server = HttpServer::new(|| {
         App::new()
             .data(AppState {
-                app_name: String::from("test")
+                app_name: String::from("test"),
             })
             .route("/", web::to(index))
             .service(
-                web::scope("/api")
-                    .route("view/{user_id}/{friend}", web::get().to(return_json))
+                web::scope("/api").route("view/{user_id}/{friend}", web::get().to(return_json)),
             )
-            .service(
-                web::scope("/app")
-                    .route("/index.html", web::get().to(index2)))
+            .service(web::scope("/app").route("/index.html", web::get().to(index2)))
     });
     // .route("/", web::get().to(index)));
 
