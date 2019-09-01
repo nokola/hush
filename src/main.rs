@@ -61,12 +61,11 @@ impl Responder for MyObj {
 // type RegisterResult = Box<dyn Future<Item = HttpResponse, Error = HttpResponse>>;
 
 fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = HttpResponse>> {
-    let result2: redis::RedisFuture<isize> = graph_functions::fetch_an_integer_async();
-
     if info.friend != "hoho5" {
         return Box::new(err(HttpResponse::Unauthorized()
             .body(format!("Unauthorized: {}. Only hoho5 is authorized", info.friend)))); // WORKING with HttpRespose
     }
+
     
     // WORKING for impl Responder:
     // HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend))
@@ -74,9 +73,9 @@ fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = Ht
     // format!("Unauthorized: !! {}", info.friend).with_status(StatusCode::UNAUTHORIZED)
     // ...do not return anything will return "200 OK"...
 
-    let friend = info.friend.clone();
+    let result2: redis::RedisFuture<isize> = graph_functions::fetch_an_integer_async();
     let result_final = result2.and_then(move |data| {
-        ok(MyObj { id: data as u32, name: friend.to_string() }) // TODO: avoid .clone() somehow?
+        ok(MyObj { id: data as u32, name: info.friend.clone() }) // TODO: avoid .clone() somehow?
     }).or_else(|redis_error| {
         err(HttpResponse::InternalServerError().body(redis_error.to_string()))
     });
