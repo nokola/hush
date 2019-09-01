@@ -2,11 +2,18 @@ use actix_web::{
     web,
     // Either,
     App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
-    error, Result};
+    error, Result
+    };
 use failure::Fail;
 use listenfd::ListenFd;
 use serde::{ Serialize, Deserialize };
-use futures::future::{ result, Future };
+use futures::future::{ 
+    ok, 
+    err, 
+    // result,
+    Future,
+    IntoFuture,
+};
 
 mod graph_functions;
 
@@ -51,19 +58,33 @@ impl Responder for MyObj {
     }
 }
 
-type RegisterResult = Box<dyn Future<Item = HttpResponse, Error = HttpResponse>>;
+// type RegisterResult = Box<dyn Future<Item = HttpResponse, Error = HttpResponse>>;
 
-fn return_json(info: web::Path<Info>) -> RegisterResult {
-    let result2: isize = graph_functions::fetch_an_integer().unwrap();
-    // Err(HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend)))
-    Box::new(result(Ok(HttpResponse::Ok().body(format!("Hello {}", info.friend)))))
-    // Box::new(result(Err(HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend)))))
+fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = HttpResponse>> {
+    let result2: redis::RedisFuture<isize> = graph_functions::fetch_an_integer_async();
 
-    // Either::A(Box::new(result(Ok(HttpResponse::Ok()
-    //         .content_type("text/html")
-    //         .body("Hello!")))))
-    // TODO: error handling
-    //MyObj { id: result as u32, name: info.friend.clone() } // TODO: avoid .clone() somehow?
+    if info.friend != "hoho5" {
+        return Box::new(err(HttpResponse::Unauthorized()
+            .body(format!("Unauthorized: {}. Only hoho5 is authorized", info.friend)))); // WORKING with HttpRespose
+    }
+    
+    // WORKING for impl Responder:
+    // HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend))
+    // "all good"
+    // format!("Unauthorized: !! {}", info.friend).with_status(StatusCode::UNAUTHORIZED)
+    // ...do not return anything will return "200 OK"...
+
+    let friend = info.friend.clone();
+    let result_final = result2.and_then(move |data| {
+        ok(MyObj { id: data as u32, name: friend.to_string() }) // TODO: avoid .clone() somehow?
+    }).or_else(|redis_error| {
+        err(HttpResponse::InternalServerError().body(redis_error.to_string()))
+    });
+
+    Box::new(result_final) // WORKING
+
+    // Box::new(err(error::ErrorInternalServerError("test"))) // WORKING with actix_web::Error
+
 }
 
 fn index(data: web::Data<AppState>) -> impl Responder {
