@@ -1,10 +1,13 @@
 use actix_web::{
-    web, 
+    web,
+    // Either,
     App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
     error, Result};
 use failure::Fail;
 use listenfd::ListenFd;
 use serde::{ Serialize, Deserialize };
+use futures::future::{ result, Future };
+
 mod graph_functions;
 
 struct AppState {
@@ -31,6 +34,7 @@ pub struct MyError {
 }
 
 impl error::ResponseError for MyError {}
+// type FutureHttpResponse = Box<Future<Item=HttpResponse, Error=HttpError>>;
 
 // Responder
 impl Responder for MyObj {
@@ -47,10 +51,19 @@ impl Responder for MyObj {
     }
 }
 
-fn return_json(info: web::Path<Info>) -> impl Responder {
-    let result: isize = graph_functions::fetch_an_integer().unwrap();
+type RegisterResult = Box<dyn Future<Item = HttpResponse, Error = HttpResponse>>;
+
+fn return_json(info: web::Path<Info>) -> RegisterResult {
+    let result2: isize = graph_functions::fetch_an_integer().unwrap();
+    // Err(HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend)))
+    Box::new(result(Ok(HttpResponse::Ok().body(format!("Hello {}", info.friend)))))
+    // Box::new(result(Err(HttpResponse::Unauthorized().body(format!("Unauthorized: {}", info.friend)))))
+
+    // Either::A(Box::new(result(Ok(HttpResponse::Ok()
+    //         .content_type("text/html")
+    //         .body("Hello!")))))
     // TODO: error handling
-    MyObj { id: result as u32, name: info.friend.clone() } // TODO: avoid .clone() somehow?
+    //MyObj { id: result as u32, name: info.friend.clone() } // TODO: avoid .clone() somehow?
 }
 
 fn index(data: web::Data<AppState>) -> impl Responder {
@@ -63,7 +76,6 @@ fn index2(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().body(format!("Hello again {}!", app_name))
 }
 
-#[rustfmt::skip]
 fn main() {
     println!("Listening on http://localhost:3000");
     let mut listenfd = ListenFd::from_env();
@@ -91,3 +103,8 @@ fn main() {
 
     server.run().unwrap();
 }
+
+// interesting example for Futures:
+// https://github.com/DoumanAsh/roseline.rs/blob/master/web/src/server/mod.rs
+
+// graphbase.io - serverless graph applications, blazing fast
