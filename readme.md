@@ -1,3 +1,6 @@
+# Hush
+Rust + RedisGraph
+
 ## Running the Server
 From `https://actix.rs/docs/autoreload/`
 

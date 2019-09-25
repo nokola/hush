@@ -85,8 +85,13 @@ fn return_json(info: web::Path<Info>) -> Box<dyn Future<Item = MyObj, Error = Ht
         .and_then(move |data| {
             ok(MyObj {
                 id: data as u32,
-                name: info.friend.clone(),
-            }) // TODO: avoid .clone() somehow?
+                name: info.into_inner().friend,
+                // on into_inner() from https://users.rust-lang.org/t/explanation-of-into-inner/13872, also see https://www.reddit.com/r/rust/comments/d4v6at/hey_rustaceans_got_an_easy_question_ask_here/f15unks/
+                // This is not related to interior mutability. into_inner() is simply (by convention) a method that consumes self and returns an inner, 
+                // “wrapped” object. In this case, the BufWriter wraps the stdout.
+                // It moves it into itself in new, so here (as is often the case) into_inner is kind of the reverse of new.
+                // In general, Rust methods are named into_something when they consume self, avoiding clones as much as possible, and to_something when they take &self, potentially cloning some data.
+            })
         })
         .or_else(|redis_error| {
             err(HttpResponse::InternalServerError().body(redis_error.to_string()))
