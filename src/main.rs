@@ -139,5 +139,3 @@ fn main() {
 
 // interesting example for Futures:
 // https://github.com/DoumanAsh/roseline.rs/blob/master/web/src/server/mod.rs
-
-// graphbase.io - serverless graph applications, blazing fast
